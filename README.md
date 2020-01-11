@@ -20,8 +20,8 @@ Before installing SciBet, the “tidyverse” package should be installed first:
 ```
 install.packages("tidyverse")
 ```
-**Installing ROGUE**  
-To install ROGUE, run:
+**Installing SciBet**  
+To install SciBet, run:
 ```
 if (!requireNamespace("devtools", quietly = TRUE)) install.packages("devtools")
 devtools::install_github("PaulingLiu/scibet")
@@ -40,8 +40,8 @@ If you use SciBet in your research, please considering citing:
 
 ## Contact
 Please contact us:  
-Baolin Liu: pauling.liu@pku.edu.cn
-Chenwei Li: lichenwei@pku.edu.cn
+Baolin Liu: pauling.liu@pku.edu.cn  
+Chenwei Li: lichenwei@pku.edu.cn  
 Zemin Zhang: zemin@pku.edu.cn
 
 ## Copyright
