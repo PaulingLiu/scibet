@@ -1,0 +1,23 @@
+Bet                     Make predictions with the trained SciBet model.
+Confusion_heatmap       Heatmap of classification result.
+Confusion_heatmap_negctrl
+                        Heatmap for the confusion matrix of the
+                        classification with the false postive control.
+DsPlot                  Point plot for entropy reduction.
+Entropy                 Compute expression entropy.
+ExportModel             Export model as matrix.
+Learn                   Train SciBet model and generate a "Bet"
+                        function for cell type prediction.
+LoadModel               Generate Bet function from a model matrix.
+Marker_heatmap          Expression patterns of informative genes across
+                        cell types.
+SEM                     S-E curve.
+SciBet                  Classify cells of a given query dataset using a
+                        reference dataset.
+SelectGene              Select informative genes of the training set in
+                        a supervised manner.
+conf_score              Calculating the confidence score C for false
+                        positive control.
+option                  Runtime options of SciBet.
+pro.core                Process scibet.core
+scibet-package          Single-Cell Identifier Based on Entropy Test

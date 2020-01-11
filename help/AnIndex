@@ -1,0 +1,17 @@
+scibet-package	scibet-package
+Bet	Bet
+Confusion_heatmap	Confusion_heatmap
+Confusion_heatmap_negctrl	Confusion_heatmap_negctrl
+conf_score	conf_score
+DsPlot	DsPlot
+Entropy	Entropy
+ExportModel	ExportModel
+Learn	Learn
+LoadModel	LoadModel
+Marker_heatmap	Marker_heatmap
+option	options
+pro.core	pro.core
+SciBet	SciBet
+scibet	scibet-package
+SelectGene	SelectGene
+SEM	SEM

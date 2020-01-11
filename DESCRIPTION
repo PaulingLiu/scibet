@@ -1,0 +1,15 @@
+Package: scibet
+Type: Package
+Title: SciBet(Single-Cell Identifier Based on Entropy Test)
+Version: 1.0
+Date: 2018-12-14
+Author: Chris Kang and Pauling Liu
+Maintainer: Chris Kang <kbxchrs@gmail.com> and Pauling Liu <pauling.liu@pku.edu.cn>
+Description: A toolset to apply the SciBet algorithm on single-cell sequencing datasets.
+License: GPL (>= 2)
+Imports: Rcpp (>= 1.0.0), RcppEigen, tidyverse, viridis, ggsci, ggplot2
+LinkingTo: Rcpp, RcppEigen, tidyverse, viridis, ggsci, ggplot2
+NeedsCompilation: yes
+RoxygenNote: 6.1.1
+Packaged: 2020-01-11 07:46:38 UTC; pauling
+Built: R 3.6.0; x86_64-pc-linux-gnu; 2020-01-11 07:48:32 UTC; unix
