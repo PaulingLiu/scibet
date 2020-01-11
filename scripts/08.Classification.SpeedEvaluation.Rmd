@@ -1,0 +1,203 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+#### Speed evaluation
+
+```{r}
+scmap_ck <- function(expr_train, expr_test){
+  
+  train_label <- expr_train$label
+  test_label <- expr_test$label
+  
+  expr_train <- expr_train %>% dplyr::select(-label) %>% t()
+  expr_test <- expr_test %>% dplyr::select(-label) %>% t()
+  
+  ann <- data.frame(cell_type1 = train_label)
+  sce <- SingleCellExperiment(assays = list(normcounts = as.matrix(expr_train)), colData = ann)
+  logcounts(sce) <- log2(normcounts(sce) + 1)
+  rowData(sce)$feature_symbol <- rownames(sce)
+  sce <- sce[!duplicated(rownames(sce)), ]
+  
+  tx_sce <- SingleCellExperiment(assays = list(normcounts = as.matrix(expr_test)))
+  logcounts(tx_sce) <- log2(normcounts(tx_sce) + 1)
+  rowData(tx_sce)$feature_symbol <- rownames(tx_sce)
+  
+  time <- system.time({
+    sce <- selectFeatures(sce, n_features = 500,  suppress_plot = T)
+    sce <- indexCluster(sce)
+    scmapCluster_results <- scmapCluster(
+      projection = tx_sce, 
+      threshold = 0,
+      index_list = list(
+        yan = metadata(sce)$scmap_cluster_index
+      )
+    )
+  })
+  
+  tibble(
+    ori = as.character(test_label),
+    prd = unlist(scmapCluster_results$combined_labs)) -> tmp
+  
+  num1 <- tmp %>% dplyr::filter(ori == prd) %>% nrow(.)
+  ac <- num1/nrow(tmp)
+  #tibble(
+    #ac = ac,
+    #time = as.numeric(time[3]),
+    #method = 'scmap'
+  #)
+  return(time[3])
+}
+
+scibet_fun <- function(expr_train, expr_test){
+  time <- system.time({  
+    prd <- scibet::SciBet(expr_train, expr_test[,-ncol(expr_test)], k = 500)
+  })
+  
+  tibble(
+    ori = as.character(expr_test$label),
+    prd = prd
+  ) -> tmp
+  
+  num1 <- tmp %>% dplyr::filter(ori == prd) %>% nrow(.)
+  ac <- num1/nrow(tmp)
+  #tibble(
+    #ac = ac,
+    #time = as.numeric(time[3]),
+    #method = 'SciBet'
+  #)
+  
+  return(time[3])
+}
+
+Seurat3 <- function(expr_train, expr_test){
+  
+  data.frame(
+    celltype = expr_train$label,
+    tech = 'xx'
+  ) -> metadata
+  
+  data.frame(
+    celltype = expr_test$label,
+    tech = 'yy'
+  ) -> metadata1
+  
+  expr_train[,-ncol(expr_train)] <- log2(expr_train[,-ncol(expr_train)] +1)
+  expr_test[,-ncol(expr_test)] <- log2(expr_test[,-ncol(expr_test)] +1)
+  
+  ori <- expr_test$label
+  X_train <- as.matrix(t(expr_train[,-ncol(expr_train)]))
+  X_test <- as.matrix(t(expr_test[,-ncol(expr_test)]))
+  
+  matr <- cbind(X_train, X_test)
+  metadata <- rbind(metadata, metadata1)
+  colnames(matr) <- as.character(1:ncol(matr))
+  rownames(metadata) <- as.character(1:nrow(metadata))
+  
+  ttest <- CreateSeuratObject(counts = matr, meta.data = metadata)
+  ttest.list <- SplitObject(object = ttest, split.by = "tech")
+  
+  time <- system.time({
+  for (i in 1:length(x = ttest.list)) {
+    ttest.list[[i]] <- NormalizeData(object = ttest.list[[i]], verbose = FALSE)
+    ttest.list[[i]] <- FindVariableFeatures(object = ttest.list[[i]], 
+                                            selection.method = "vst", nfeatures = 2000, verbose = FALSE)
+  }
+  
+  anchors <- FindTransferAnchors(reference = ttest.list[[1]], 
+                                 query = ttest.list[[2]], 
+                                 dims = 1:30)
+  
+  predictions <- TransferData(anchorset = anchors,
+                              refdata = ttest.list[[1]]$celltype,
+                              dims = 1:30)
+  
+  })
+  
+  tibble(
+    ori = ori,
+    prd = predictions$predicted.id
+  ) -> tmp
+  
+  num1 <- tmp %>% dplyr::filter(ori == prd) %>% nrow(.)
+  ac <- num1/nrow(tmp)
+  #tibble(
+    #ac = ac,
+    #time = as.numeric(time[3]),
+    #method = 'Seurat3'
+  #)
+  return(time[3])
+}
+
+pipe_fun <- function(.x, .y){ 
+
+  train <- matr[s1,]
+  test <- matr[s2,]
+
+  
+  ck1 <- scmap_ck(train, test)
+  ck2 <- scibet_fun(train, test)
+  ck3 <- Seurat3(train, test)
+  
+  ck1 %>%
+    dplyr::bind_rows(ck2) %>%
+    dplyr::bind_rows(ck3) -> res
+  
+  return(res)
+}
+```
+
+
+```{r}
+matr <- readr::read_rds("/data1/pauling/01_classifier/01_data/15_revise/02.CrossValidationAddData/Immune.rds.gz")
+
+n.cell <- c(1000,10000,20000,50000,90000)
+
+res <- c()
+for (i in 1:length(n.cell)) {
+  s1 <- sample(1:nrow(matr), n.cell[i], replace = T)
+  s2 <- sample(1:nrow(matr), n.cell[i], replace = T)
+  
+  #s2 <- sample(1:nrow(matr), n.cell[i], replace = T)
+  train <- matr[s1,]
+  test <- matr[s2,]
+  
+  ck1 <- scmap_ck(train, test)
+  ck2 <- scibet_fun(train, test)
+  ck3 <- Seurat3(train, test)
+  
+  tibble(
+    time = c(ck1,ck2, ck3),
+    method = c("scmap","SciBet","Seurat v3"),
+    number = n.cell[i]
+  ) -> tmp
+  
+  res <- res %>% dplyr::bind_rows(tmp)
+}
+```
+
+```{r, fig.width=6.4, fig.height=3.5}
+res %>%
+  dplyr::rename(Method = method) %>%
+  ggplot(aes(number, time)) +
+  geom_smooth(aes(colour = Method), se = F, span = 1.2) +
+  geom_point(aes(colour = Method)) +
+  theme_classic() +
+  scale_y_log10() +
+  scale_x_log10() +
+  scale_color_nejm() +
+  theme(
+    axis.title = element_text(size = 13),
+    axis.text = element_text(size = 10),
+    legend.title = element_text(size = 13),
+    legend.text = element_text(size = 13),
+    axis.text.y = element_text(color="black"),
+    axis.text.x = element_text(color="black")
+  ) +
+  labs(
+    x = "Number of cells",
+    y = "Time (s)"
+  )
+```
+

@@ -1,0 +1,203 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(SingleCellExperiment)
+library(tidyverse)
+library(scibet)
+library(ggplot2)
+library(scmap)
+```
+
+
+```{r}
+expr <- readr::read_rds('/home/pauling/projects/02_data/08_10X_data/immu_tpm.rds.gz')
+```
+
+
+```{r}
+l <- expr$label
+expr$label <- NULL
+expr <- lapply(expr, as.numeric) %>% do.call("data.frame", .)
+expr$label <- l
+
+get_time <- function(num){
+  ID <- sample(1:nrow(expr),num)
+  tmp <- expr[ID,]
+  timing1 <- system.time({
+    a <- SelectGene(tmp, k = 500)
+  })
+  timing2 <- M3Gene_fun(tmp)
+  timing3 <- Ftest_fun(tmp)
+  tibble(
+    method = c('Entropy','M3drop','F-test'),
+    time = list(timing1, timing2, timing3)
+  )
+}
+```
+
+```{r}
+M3Gene_fun <- function(expr){ 
+  ann <- data.frame(cell_type1 = expr$label) 
+  expr <- expr %>% dplyr::select(-label)
+  expr <- t(expr)
+  
+  sce <- SingleCellExperiment(assays = list(normcounts = as.matrix(expr)), colData = ann)
+  logcounts(sce) <- log2(normcounts(sce) + 1)
+  rowData(sce)$feature_symbol <- rownames(sce)
+  sce <- sce[!duplicated(rownames(sce)), ]
+  time <- system.time({
+    sce <- selectFeatures(sce, suppress_plot = T, n_features = 500)
+  })
+  return(time)
+}
+Ftest_fun <- function(expr){ 
+  expr[,-ncol(expr)] <- log2(expr[,-ncol(expr)] + 1)
+  
+  time <- system.time({
+    tibble(gene = colnames(expr)[-ncol(expr)]) %>%
+      dplyr::mutate(pval = purrr::map_dbl(
+        .x = gene,
+        .f = function(.x){
+          tibble(
+            gene = unlist(expr[, .x]),
+            label = expr$label
+          ) %>%
+            aov(gene~label, data = .) %>%
+            summary() -> res
+        
+          res[[1]][[5]][1]
+        }
+      )
+      ) -> FtestGene
+  })
+  
+  return(time)
+}
+```
+
+
+```{r}
+tibble(
+  num = c(500,1000,2000,5000,10000,20000,50000,90000)
+) %>%
+  dplyr::mutate(time = purrr::map(num, get_time)) -> time
+
+tibble(
+  num = c(100)
+) %>%
+  dplyr::mutate(time = purrr::map(num, get_time)) -> time_2
+```
+
+```{r}
+time_2 %>%
+  dplyr::mutate(
+    time2 = purrr::map2(
+      .x = time,
+      .y = num,
+      .f = function(.x, .y){
+        t1 <- as.numeric(.x$time[[1]][3])
+        t2 <- as.numeric(.x$time[[2]][3])
+        t3 <- as.numeric(.x$time[[3]][3])
+        tibble(
+          method = c('Entropy','M3drop','F-test'),
+          time = c(t1, t2, t3),
+          num = .y
+        )
+      }
+    )
+  ) -> time_2
+```
+
+```{r, fig.width=7, fig.height=4}
+Reduce(rbind, time$time2) %>%
+  #dplyr::bind_rows(time_2$time2[[1]]) %>%
+  dplyr::mutate(method = ifelse(method == 'Entropy', 'E-test',method)) %>%
+  dplyr::filter(num %in% c(1000,10000,20000,50000,90000)) %>%
+  dplyr::mutate(time = time + 1) %>%
+  ggplot(aes(num, time)) +
+  geom_smooth(aes(colour = method), method = 'loess', se = F, span = 2) +
+  geom_point(aes(colour = method), size = 2) +
+  theme_classic() +
+  theme(
+    legend.position = 'top',
+    axis.title = element_text(size = 15),
+    axis.text = element_text(size = 15),
+    legend.title = element_text(size = 0),
+    legend.text = element_text(size = 15),
+    axis.text.y = element_text(color="black"),
+    axis.text.x = element_text(color="black")
+  ) +
+  labs(
+    x = "Number of cells",
+    y = "Time (s)"
+  ) +
+  scale_colour_nejm() +
+  scale_x_log10() +
+  scale_y_log10()
+```
+
+```{r}
+time_2 %>%
+  dplyr::mutate(
+    time2 = purrr::map2(
+      .x = time,
+      .y = num,
+      .f = function(.x, .y){
+        t1 <- as.numeric(.x$time[[1]][3])
+        t2 <- as.numeric(.x$time[[2]][3])
+        t3 <- as.numeric(.x$time[[3]][3])
+        tibble(
+          method = c('Entropy','M3drop','F-test'),
+          time = c(t1, t2, t3),
+          num = .y
+        )
+      }
+    )
+  ) -> time2
+
+
+  
+Reduce(rbind, time$time2) %>%
+  dplyr::mutate(method = ifelse(method == 'Entropy', 'E-test',method)) %>%
+  tidyr::nest(-method) %>%
+  dplyr::mutate(
+    sd = purrr::map_dbl(
+      .x = data,
+      .f = function(.x){
+        sd(.x$time)
+      }
+    )
+  ) -> sd_da
+
+Reduce(rbind, time$time2) %>%
+  dplyr::mutate(method = ifelse(method == 'Entropy', 'E-test',method)) %>%
+  dplyr::group_by(method) %>%
+  dplyr::summarise(mean = mean(time)) %>%
+  dplyr::mutate(sd = sd_da$sd) %>%
+  dplyr::mutate(mean = mean + 1) %>%
+  dplyr::mutate(lower = mean - sd) %>%
+  dplyr::mutate(upper = mean + sd) %>%
+  ggplot(aes(factor(method, levels = c('E-test', 'M3drop', 'F-test')), mean)) +
+  geom_col(aes(fill = method)) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.1) +
+  theme_classic() +
+  theme(
+    legend.position = 'none',
+    axis.title = element_text(size = 15),
+    axis.text = element_text(size = 15),
+    legend.title = element_text(size = 15),
+    legend.text = element_text(size = 15),
+    axis.text.y = element_text(color="black"),
+    axis.text.x = element_text(color="black")
+  ) +
+  labs(
+    x = "",
+    y = "Time/s"
+  ) +
+  scale_y_log10() +
+  scale_fill_manual(values = c("#FF1493", "#FF6A6A", "#00C5CD"))
+```
+

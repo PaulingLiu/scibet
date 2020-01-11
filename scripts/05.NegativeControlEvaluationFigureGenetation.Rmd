@@ -1,0 +1,281 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r, fig.width=5, fig.height=3.5}
+nc.path <- "/data1/pauling/01_classifier/01_data/15_revise/05.negative.contral"
+out.path <- "/home/pauling/projects/01_classifier/04_figures/04_NegativeContral"
+
+files <- list.files(path = nc.path)
+
+for (file in files) {
+  nc.da <- readr::read_rds(file.path(nc.path,file))
+  title.name <- stringr::str_remove(file, ".rds.gz")
+  
+  nc.da <- nc.da[[1]]
+  nc.da <- nc.da %>% dplyr::mutate(prob = ifelse(is.na(prob), 0, prob))
+  
+  negc.res <- list()
+  for (i in 1:50) {
+    intc <- nrow(nc.da)/50
+    n1 <- (i-1)*intc + 1
+    n2 <- i*intc
+    
+    tmp <- nc.da[n1:n2,]
+    
+    fpr <- c(0.001,0.005,0.01,0.05)
+    
+    nc.res <- c()
+    for (m in c("SciBet","scmap","Seurat")) {
+      tmp1 <- tmp %>% dplyr::filter(method == m)
+      tmp1.neg <- tmp1 %>% dplyr::filter(ori == "Neg") %>% dplyr::arrange(desc(prob))
+      
+      n.neg <- nrow(tmp1.neg)
+      tmp1 <- tmp1 %>% dplyr::filter(ori != "Neg")
+      acc <- c()
+      k <- 0
+      
+      for (f in fpr) {
+        k <- k + 1
+        cutoff <- tmp1.neg$prob[ceiling(n.neg*f)]
+        n.positive <- tmp1 %>% dplyr::filter(prob >= cutoff) %>% dplyr::filter(ori == prd) %>% nrow()
+        acc[k] <- n.positive/nrow(tmp1)
+      }
+      
+      tmp.nc.res <- tibble(acc = acc, fpr = fpr, method = m)
+      nc.res <- rbind(nc.res, tmp.nc.res)
+    }
+    negc.res[[i]] <- nc.res
+  }
+  
+  Reduce(rbind, negc.res) %>%
+    ggplot(aes(factor(fpr), acc)) +
+    geom_boxplot(aes(colour = method), outlier.shape = NA) +
+    #dplyr::group_by(gene_num, Gene, GSE) %>%
+    #dplyr::summarise(ck = mean(ck)) %>%
+    #ggplot(aes(factor(gene_num), ck)) +
+    geom_point(aes(factor(fpr), acc, group = method, colour = method), position=position_dodge(width = 0.75), size = 0.5) +
+    theme_classic() +
+    theme(
+      legend.position = 'none',
+      axis.title = element_text(size = 15),
+      axis.text = element_text(size = 15),
+      legend.title = element_text(size = 0),
+      legend.text = element_text(size = 13),
+      axis.text.y = element_text(color="black"),
+      axis.text.x = element_text(color="black")
+    ) +
+    scale_colour_nejm() +
+    labs(
+      y = "Classification accuracy",
+      x = "False positive rate"
+    ) +
+    labs(title = title.name) +
+    theme(plot.title = element_text(hjust = 0.5, size = 15), 
+          plot.subtitle = element_text(hjust = 0.5, size = 15)) -> p
+  
+  ggsave(plot = p, filename = paste0(title.name,".pdf"), path = out.path, width = 5, height = 3.5, units = "in")
+}
+```
+
+###Combination
+```{r}
+files <- list.files(path = nc.path)
+
+res <- c()
+for (file in files) {
+  nc.da <- readr::read_rds(file.path(nc.path,file))
+  title.name <- stringr::str_remove(file, ".rds.gz")
+  
+  nc.da <- nc.da[[1]]
+  nc.da <- nc.da %>% dplyr::mutate(prob = ifelse(is.na(prob), 0, prob))
+  
+  negc.res <- list()
+  for (i in 1:50) {
+    intc <- nrow(nc.da)/50
+    n1 <- (i-1)*intc + 1
+    n2 <- i*intc
+    
+    tmp <- nc.da[n1:n2,]
+    
+    fpr <- c(0.001,0.005,0.01,0.05)
+    
+    nc.res <- c()
+    for (m in c("SciBet","scmap","Seurat")) {
+      tmp1 <- tmp %>% dplyr::filter(method == m)
+      tmp1.neg <- tmp1 %>% dplyr::filter(ori == "Neg") %>% dplyr::arrange(desc(prob))
+      
+      n.neg <- nrow(tmp1.neg)
+      tmp1 <- tmp1 %>% dplyr::filter(ori != "Neg")
+      acc <- c()
+      k <- 0
+      
+      for (f in fpr) {
+        k <- k + 1
+        cutoff <- tmp1.neg$prob[ceiling(n.neg*f)]
+        n.positive <- tmp1 %>% dplyr::filter(prob >= cutoff) %>% dplyr::filter(ori == prd) %>% nrow()
+        acc[k] <- n.positive/nrow(tmp1)
+      }
+      
+      tmp.nc.res <- tibble(acc = acc, fpr = fpr, method = m)
+      nc.res <- rbind(nc.res, tmp.nc.res)
+    }
+    negc.res[[i]] <- nc.res
+  }
+  
+  negc.res <- Reduce(rbind, negc.res)
+  negc.res <- negc.res %>% 
+    dplyr::group_by(method, fpr) %>% 
+    dplyr::summarise(acc = mean(acc)) %>% 
+    dplyr::mutate(dataset = title.name)
+  
+  res <- res %>% dplyr::bind_rows(negc.res)
+}
+```
+
+```{r}
+res %>%
+  ggplot(aes(factor(fpr), acc)) +
+  geom_boxplot(aes(colour = method), outlier.shape = NA) +
+  geom_point(aes(factor(fpr), acc, group = method, colour = method), position=position_dodge(width = 0.75), size = 1.5) +
+  theme_classic() +
+  theme(
+    legend.position = 'top',
+    axis.title = element_text(size = 15),
+    axis.text = element_text(size = 15),
+    legend.title = element_text(size = 0),
+    legend.text = element_text(size = 13),
+    axis.text.y = element_text(color="black"),
+    axis.text.x = element_text(color="black")
+  ) +
+  scale_colour_nejm() +
+  labs(
+    y = "Classification accuracy",
+    x = "False positive rate"
+  )
+```
+
+```{r}
+files <- list.files(path = nc.path)
+
+res <- c()
+for (file in files) {
+  nc.da <- readr::read_rds(file.path(nc.path,file))
+  title.name <- stringr::str_remove(file, ".rds.gz")
+  
+  nc.da <- nc.da[[1]]
+  nc.da <- nc.da %>% dplyr::mutate(prob = ifelse(is.na(prob), 0, prob))
+  
+  negc.res <- list()
+  for (i in 1:50) {
+    intc <- nrow(nc.da)/50
+    n1 <- (i-1)*intc + 1
+    n2 <- i*intc
+    
+    tmp <- nc.da[n1:n2,]
+    
+    fpr <- c(0.001,0.005,0.01,0.05)
+    
+    nc.res <- c()
+    for (m in c("SciBet","scmap","Seurat")) {
+      tmp1 <- tmp %>% dplyr::filter(method == m)
+      tmp1.neg <- tmp1 %>% dplyr::filter(ori == "Neg") %>% dplyr::arrange(desc(prob))
+      
+      n.neg <- nrow(tmp1.neg)
+      tmp1 <- tmp1 %>% dplyr::filter(ori != "Neg")
+      acc <- list()
+      k <- 0
+      
+      for (f in fpr) {
+        k <- k + 1
+        cutoff <- tmp1.neg$prob[ceiling(n.neg*f)]
+        p.cell <- tmp1 %>% dplyr::filter(prob >= cutoff)
+        
+        tmp.matr <- dplyr::count(p.cell, ori, prd) %>% 
+          tidyr::spread(key = prd, value = n) %>% 
+          dplyr::mutate(FPR = f)
+          
+        acc[[k]] <- tmp.matr
+      }
+      
+      acc <- Reduce(rbind, acc) %>% as.tibble %>% dplyr::mutate(method = m)
+      nc.res <- rbind(nc.res, acc)
+    }
+    negc.res[[i]] <- nc.res
+  }
+  
+  negc.res <- Reduce(rbind, negc.res)
+  #negc.res <- negc.res %>% 
+    #dplyr::group_by(method, fpr) %>% 
+    #dplyr::summarise(acc = mean(acc)) %>% 
+    #dplyr::mutate(dataset = title.name)
+  
+  res <- res %>% dplyr::bind_rows(negc.res)
+}
+```
+
+
+```{r}
+celltype.res <- list()
+
+for (i in 1:length(files)) {
+  res <- readr::read_rds(file.path(files.pa, files[i]))
+  
+  methods <- c("scmap", "SciBet", "Seurat")
+  tmp.res <- list()
+  
+  for (m in 1:length(methods)) {
+    a <- res %>% dplyr::filter(method == methods[m])
+    
+    table(a$ori) %>%
+      as.data.frame() %>%
+      dplyr::mutate(Freq = round(Freq/sum(Freq),3)) %>%
+      dplyr::mutate(name = purrr::map2_chr(Var1, Freq, .f = function(.x, .y){paste0(.x, " (", 100*.y,"%)")})) -> name
+    
+    tmp.matr <- dplyr::count(a, ori, prd) %>% tidyr::spread(key = prd, value = n)
+    tmp.matr[is.na(tmp.matr)] <- 0
+    row_mame <- tmp.matr$ori
+    tmp.matr <- tmp.matr[,-1]
+    tmp.matr <- tmp.matr/rowSums(tmp.matr)
+    tmp.matr %>%
+      dplyr::mutate(ori = colnames(tmp.matr)[1:nrow(tmp.matr)]) %>%
+      tidyr::gather(key = "Prediction", value = "Accuracy", -ori) %>%
+      dplyr::mutate(methods = methods[m]) %>%
+      dplyr::filter(ori == Prediction) %>%
+      dplyr::mutate(frac = name$name) -> tmp.res[[m]]
+  }
+  
+  print(i)
+  tmp.res <- Reduce(rbind, tmp.res) %>% dplyr::mutate(file = files[i])
+  celltype.res[[i]] <- tmp.res
+}
+```
+
+```{r, fig.width=6.5, fig.height=4.5}
+cutoff <- 0.1
+
+res %>%
+  dplyr::rename(Datasets = dataset) %>%
+  dplyr::filter(fpr == 0.01) %>%
+  tidyr::spread(key = method, value = acc) %>%
+  dplyr::mutate(Datasets = paste0("Dataset",c(1:10))) %>%
+  dplyr::mutate(Datasets = factor(Datasets, levels = paste0("Dataset",c(1:10)))) %>%
+  ggplot(aes(Seurat, SciBet)) +
+  geom_segment(aes(x = cutoff, y = cutoff, xend = 1, yend = 1), linetype = "dashed", color = "grey50") +
+  geom_point(aes(colour = Datasets), size = 4) +
+  xlim(cutoff,1) +
+  ylim(cutoff,1) +
+  theme_bw() +
+  scale_color_manual(values = my.co) +
+  theme(
+      axis.title = element_text(size = 15),
+      axis.text = element_text(size = 12),
+      legend.title = element_text(size = 12),
+      legend.text = element_text(size = 12),
+      axis.text.y = element_text(color="black"),
+      axis.text.x = element_text(color="black")
+  )
+```
+
