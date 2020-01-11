@@ -9,19 +9,19 @@
   A toolset to apply the SciBet algorithm on single-cell sequencing datasets.
 }
 \details{
-  
+
 }
 \author{
-Chris Kang
+Pauling Liu
 
-Maintainer: Chris Kang <kbxchrs@gmail.com>
+Maintainer: Pauling Liu <pauling.liu@pku.edu.cn>
 }
 \references{
-  
+
 }
 \keyword{ package }
 \seealso{
-  
+
 }
 \examples{
   \dontrun{
