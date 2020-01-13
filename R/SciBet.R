@@ -49,9 +49,12 @@ SelectGene <- function(expr, k = 1000, r = FALSE) {
     gene_label <- Reduce(rbind, gene_label$data)
     out <- out %>% dplyr::inner_join(gene_label, by = "gene") %>%
       dplyr::arrange(flag, desc(Total))
-    return(out$gene[1:k])
+
+    return(out)
   }
-  return(colnames(expr)[out + 1])
+  else{
+    return(colnames(expr)[out + 1])
+  }
 }
 
 #' Train SciBet model and generate a "Bet" function for cell type prediction.
