@@ -53,10 +53,10 @@ SEXP DsGene(SEXP expr_r, SEXP label_r, bool as_df, int num_top, int additional, 
         {
             cur_row->at(j) /= label_n[j];
             sum += cur_row->at(j);
-            cur_row->at(j) = 0.18 * std::log(0.03 * cur_row->at(j) + 1);
+            cur_row->at(j) = std::log(cur_row->at(j) + 1);
             s_ds += cur_row->at(j);
         }
-        sum_ds[i] = {i, 0.18 * std::log(0.03 * sum / n_label + 1) * n_label - s_ds};
+        sum_ds[i] = {i, std::log(sum / n_label + 1) * n_label - s_ds};
     }
     if (as_df)
     {
@@ -242,7 +242,7 @@ SEXP NullTest(SEXP ref_r, SEXP query_r, SEXP null_r, SEXP label_r, int n_feat, i
             sum += cur_row->at(j);
         }
         e1[i] = sum / n_label;
-        ds[i] = {i, std::log(0.03 * e1[i] + 1) - std::log(0.03 * null[i] + 1)};
+        ds[i] = {i, std::log(e1[i] + 1) - std::log(null[i] + 1)};
     }
     double sum_e1 = 0;
     double sum_null = 0;
