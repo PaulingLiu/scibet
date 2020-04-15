@@ -16,8 +16,12 @@ Fast, robust and technology-independent computational methods are needed for sup
 
 ## Installation Guide
 **Installing dependency package**  
-Before installing SciBet, the “tidyverse” package should be installed first:
+Before installing SciBet, the dependency packages should be installed first:
 ```
+install.packages("Rcpp")
+install.packages("RcppEigen")
+install.packages("ggsci")
+install.packages("viridis")
 install.packages("tidyverse")
 ```
 **Installing SciBet**  
