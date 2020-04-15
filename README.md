@@ -51,4 +51,4 @@ Chenwei Li: lichenwei@pku.edu.cn
 Zemin Zhang: zemin@pku.edu.cn
 
 ## Copyright
-©2019 Chenwei Li, Baolin Liu. [Zhang Lab](http://cancer-pku.cn/). All rights reserved.
+©2019 Chenwei Li, Baolin Liu, Boxi Kang. [Zhang Lab](http://cancer-pku.cn/). All rights reserved.
